@@ -1,0 +1,68 @@
+name: CaterEconomy
+main: cn.miaomc.catereconomy.bukkit.CaterEconomyBukkit
+version: ${project.version}
+author: MiaoMC
+description: MiaoMC 多货币经济插件（每种货币可单独选择 MySQL 或本地存储）
+# 1.13 以下的服务端会忽略此项；26.x 需要它才不会按旧插件兼容模式加载
+api-version: "1.13"
+softdepend: [Vault, PlaceholderAPI]
+loadbefore: [Essentials, DeluxeMenus, ChestCommands]
+commands:
+  money:
+    description: 查看余额
+    usage: "/money [货币] [玩家]"
+    aliases: [balance, bal, qian]
+  pay:
+    description: 向其他玩家转账
+    usage: "/pay <玩家> <数量> [货币]"
+    aliases: [zhuanzhang]
+  eco:
+    description: 管理员调整余额（兼容 Essentials / GemsEconomy 旧格式）
+    usage: "/eco <give|take|set|reset> <玩家> [数量] [货币]"
+    aliases: [economy]
+  baltop:
+    description: 余额排行
+    usage: "/baltop [货币] [页码]"
+    aliases: [moneytop, balancetop]
+  paylog:
+    description: 查看转账记录
+    usage: "/paylog [玩家] [货币] [all] [页码]"
+    aliases: [zhuanzhangjilu]
+  catereconomy:
+    description: CaterEconomy 管理
+    usage: "/catereconomy <reload|info|import>"
+    aliases: [ceco]
+permissions:
+  catereconomy.balance:
+    description: 查看自己的余额
+    default: true
+  catereconomy.balance.others:
+    description: 查看他人余额
+    default: op
+  catereconomy.pay:
+    description: 转账
+    default: true
+  catereconomy.top:
+    description: 查看排行
+    default: true
+  catereconomy.log:
+    description: 查看自己的转账记录
+    default: true
+  catereconomy.log.others:
+    description: 查看他人的记录
+    default: op
+  catereconomy.admin.eco:
+    description: 使用 /eco 调整余额
+    default: op
+  catereconomy.bypass.cooldown:
+    description: 转账无冷却
+    default: op
+  catereconomy.bypass.tax:
+    description: 转账免税
+    default: false
+  catereconomy.bypass.sameip:
+    description: 不受同 IP 转账限制
+    default: false
+  catereconomy.admin:
+    description: 重载、查看状态、导入数据
+    default: op

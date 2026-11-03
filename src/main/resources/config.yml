@@ -1,0 +1,125 @@
+# ======================================================================
+# CaterEconomy 多货币经济插件 配置文件                                   # 修改后执行 /catereconomy reload 生效
+# ======================================================================
+
+server-name: "lobby"                     # 本服名称，写进流水记录，用来区分是哪个子服产生的变动
+uuid-mode: offline                       # offline：离线服，可给没进过服的玩家按离线 UUID 建账户；online：正版服，只能操作已有账户
+
+daily-reset:                             # 每日限制（接收上限、同 IP 次数和额度）的重置设置
+  timezone: "Asia/Shanghai"              # 按这个时区的零点重置，计数按日期分开存，过了零点自动从 0 开始
+
+same-ip:                                 # 同 IP 识别的全局设置，各货币是否启用见 currencies.<货币>.pay.same-ip
+  window-days: 30                        # 两个账号在最近多少天内用过同一个 IP，就算作同 IP 账号
+  ignore-ips:                            # 不参与同 IP 判断的地址列表
+    - "127.0.0.1"                        # 本机地址；没开 BungeeCord IP 转发时所有人都是它，必须忽略
+    - "0:0:0:0:0:0:0:1"                  # IPv6 本机地址，同上
+
+storages:                                # 存储后端，名字随意，下面的货币用 storage: 名字 来引用
+  shared:                                # 一个名为 shared 的存储
+    type: mysql                          # mysql：共享数据库，多个子服填同一个库和表前缀即可共享余额
+    host: "127.0.0.1"                    # MySQL 地址
+    port: 3306                           # MySQL 端口
+    database: "catereconomy"             # 数据库名，需提前建好
+    username: "catereconomy"             # 数据库账号，建议单独建低权限账号，不要用 root
+    password: "请修改"                    # 数据库密码
+    properties: "useSSL=false&characterEncoding=utf8&serverTimezone=Asia/Shanghai"  # JDBC 连接参数，一般不用改
+    pool-size: 4                         # 连接数，也是并发处理的线程数，1~16
+    table-prefix: "catereco_"            # 表名前缀，只能用字母、数字和下划线
+  local:                                 # 一个名为 local 的存储
+    type: sqlite                         # sqlite：本服本地文件，数据只属于这个子服（服务端自带驱动，1.8.8~26.x 均可用）
+    file: "local.db"                     # 数据文件路径，相对路径以插件目录为准
+    table-prefix: "catereco_"            # 表名前缀
+
+currencies:                              # 货币列表；新增货币就复制一段，改 id 和内容，然后 reload
+  miaobi:                                # 货币 id，只能用小写字母、数字和下划线；有数据后不要再改
+    name: "喵币"                          # 显示名，命令和变量里也可以直接写它
+    aliases: [mb]                        # 别名，命令和变量里可以代替 id 使用
+    storage: shared                      # 使用哪个存储（对应上面 storages 下的名字）
+    decimals: 0                          # 小数位数 0~4，0 表示只有整数；有数据后不要改小
+    start-balance: 0                     # 新账户的初始余额
+    max-balance: 0                       # 余额上限，0 为不限制
+    format: "&d{amount} &f喵币"           # 显示格式，{amount} 为金额，{name} 为名称，支持 & 颜色代码
+    grouping: true                       # 金额是否显示千分位逗号，如 1,200
+    pay:                                 # 玩家之间转账的设置
+      enabled: true                      # 是否允许玩家转账这种货币
+      min: 1                             # 单笔最少转多少
+      max: 0                             # 单笔最多转多少，0 为不限制
+      cooldown-seconds: 3                # 两次转账之间的冷却秒数，有 catereconomy.bypass.cooldown 权限可无视
+      confirm-above: 10000               # 单笔达到这个金额要输入 /pay confirm 二次确认，0 为关闭
+      tax:                               # 转账税，税款直接销毁，不归任何人
+        percent: 5                       # 税率百分比，0~100（不含 100），如 5 表示 5%，税额向上取整
+        mode: sender                     # sender：付款人额外付税（转 100 付 105，对方到账 100）；receiver：从到账里扣（转 100 对方到账 95）
+      daily-receive-limit: 100000        # 单个玩家每天最多接收多少转账（按到账金额算），每天零点重置，0 为不限制
+      same-ip:                           # 同 IP 账号之间的转账限制，防止开小号刷钱；有 catereconomy.bypass.sameip 权限可无视
+        enabled: true                    # 是否启用
+        max-count: 3                     # 同 IP 账号之间每天最多转几次（按付款人 IP 统计），0 为完全禁止，-1 为不限次数
+        max-amount: 5000                 # 同 IP 账号之间每天最多转多少（按到账金额算），-1 为不限额度
+  xingbi:                                # 第二种货币：星币
+    name: "星币"                          # 显示名
+    aliases: [xb]                        # 别名
+    storage: shared                      # 也存在共享 MySQL 里
+    decimals: 0                          # 只有整数
+    start-balance: 0                     # 初始余额
+    max-balance: 0                       # 不限上限
+    format: "&b{amount} &f星币"           # 显示格式
+    grouping: true                       # 显示千分位
+    pay:                                 # 转账设置
+      enabled: true                      # 允许转账
+      min: 1                             # 单笔最少 1
+      max: 0                             # 单笔不限上限
+      cooldown-seconds: 3                # 冷却 3 秒
+      confirm-above: 10000               # 1 万以上二次确认
+      tax:                               # 转账税
+        percent: 10                      # 税率 10%
+        mode: receiver                   # 从到账金额里扣
+      daily-receive-limit: 50000         # 每人每天最多收 5 万
+      same-ip:                           # 同 IP 限制
+        enabled: true                    # 启用
+        max-count: 0                     # 0：同 IP 账号之间完全禁止转星币
+        max-amount: -1                   # 已禁止转账，额度不起作用
+  yinbi:                                 # 第三种货币：银币，只在本服使用
+    name: "银币"                          # 显示名
+    aliases: [yb, coins]                 # 别名；coins 方便兼容旧的 GemsEconomy 命令和变量
+    storage: local                       # 存在本服的本地文件里
+    decimals: 2                          # 支持两位小数
+    start-balance: 0                     # 初始余额
+    max-balance: 0                       # 不限上限
+    format: "&7{amount} &f银币"           # 显示格式
+    grouping: true                       # 显示千分位
+    pay:                                 # 转账设置
+      enabled: false                     # 不允许玩家之间转账银币
+
+default-currency: miaobi                 # 命令里不写货币时默认用哪种（/pay、/eco、/baltop、/pay limit）
+
+vault:                                   # Vault 只能对接一种货币，Essentials、商店等插件通过 Vault 用的就是它
+  enabled: true                          # 是否向 Vault 提供经济服务
+  currency: miaobi                       # 提供给 Vault 的货币
+  timeout-ms: 3000                       # Vault 是同步接口，加减款时主线程最多等数据库多少毫秒
+
+sync:                                    # 跨服同步
+  refresh-seconds: 5                     # 每隔多少秒从 MySQL 刷新一次在线玩家余额，用于显示其他子服造成的变动
+  preload-timeout-ms: 3000               # 玩家进服前预加载余额最多等多少毫秒（在异步线程中，不卡主线程）
+
+top:                                     # 排行榜变量的缓存
+  refresh-seconds: 60                    # 排行缓存刷新间隔（秒）
+  cache-size: 10                         # 缓存前多少名，供 %catereconomy_top_...% 变量使用
+
+placeholders:                            # PlaceholderAPI 变量设置
+  eco-identifier: true                   # 额外注册 %eco_xxx% 变量，与 %catereconomy_xxx% 完全相同
+  gemseconomy-compat: true               # 额外注册 %gemseconomy_balance_<货币>%，旧菜单不用改（装着 GemsEconomy 时不生效）
+
+page-size: 8                             # /baltop 和 /paylog 每页显示几条
+
+pay-confirm-seconds: 30                  # /pay confirm 的有效时间（秒）
+
+records:                                 # 流水记录
+  keep-days: 0                           # 流水保留天数，0 为永久保留
+
+import:                                  # 从其他插件导入数据时用的数据库（只读，不会修改对方的表）
+  gemseconomy:                           # GemsEconomy 的数据库；命令：/catereconomy import gemseconomy <源货币> <目标货币> [confirm]
+    host: "127.0.0.1"                    # GemsEconomy 的 MySQL 地址
+    port: 3306                           # 端口
+    database: "lobbyeco"                 # 数据库名
+    username: "root"                     # 账号，只需要 SELECT 权限
+    password: ""                         # 密码
+    table-prefix: "gemseconomy"          # GemsEconomy 的表前缀（config.yml 里的 tableprefix）
