@@ -26,6 +26,7 @@ public final class CaterEconomyBukkit extends JavaPlugin implements Listener {
     private Settings settings;
     private Messages messages;
     private Commands commands;
+    private PayGui payGui;
     private VaultHook vault;
     private Object placeholders;
     private final List<BukkitTask> tasks = new ArrayList<BukkitTask>();
@@ -45,6 +46,8 @@ public final class CaterEconomyBukkit extends JavaPlugin implements Listener {
             command.setTabCompleter(commands);
         }
         getServer().getPluginManager().registerEvents(this, this);
+        payGui = new PayGui(this);
+        getServer().getPluginManager().registerEvents(payGui, this);
     }
 
     @Override
@@ -112,6 +115,7 @@ public final class CaterEconomyBukkit extends JavaPlugin implements Listener {
     }
 
     private void shutdown() {
+        if (payGui != null) payGui.closeAll();
         for (BukkitTask task : tasks) task.cancel();
         tasks.clear();
         if (vault != null) {
@@ -143,6 +147,14 @@ public final class CaterEconomyBukkit extends JavaPlugin implements Listener {
 
     Messages messages() {
         return messages;
+    }
+
+    Commands commands() {
+        return commands;
+    }
+
+    PayGui payGui() {
+        return payGui;
     }
 
     // ---------------------------------------------------------------- 玩家缓存

@@ -47,6 +47,13 @@ final class Settings {
     final ZoneId zone;
     final int ipWindowDays;
     final Set<String> ignoredIps = new HashSet<String>();
+    final String payDefaultCurrency;
+    final boolean guiEnabled;
+    final boolean guiSkipSingleCurrency;
+    final List<String> guiPresets = new ArrayList<String>();
+    final int guiCustomTimeoutSeconds;
+    final Set<String> guiCancelWords = new HashSet<String>();
+    final Map<String, String> guiIcons = new HashMap<String, String>();
 
     Settings(FileConfiguration c, File dataFolder) {
         serverName = c.getString("server-name", "lobby");
@@ -144,6 +151,8 @@ final class Settings {
                             pay == null ? CurrencyDef.UNLIMITED : limit(pay, "same-ip.max-amount", decimals, pw));
             if (def.maxBalance > 0 && def.startBalance > def.maxBalance) throw new IllegalArgumentException(where + ".start-balance 大于 max-balance");
             currencies.add(def);
+            String icon = s.getString("icon", "");
+            if (!icon.trim().isEmpty()) guiIcons.put(id, icon.trim().toUpperCase(Locale.ROOT));
             if (pay != null) confirmAbove.put(id, amount(pay, "confirm-above", decimals, pw));
         }
 
@@ -160,6 +169,20 @@ final class Settings {
         gemsPlaceholders = c.getBoolean("placeholders.gemseconomy-compat", true);
         ecoPlaceholders = c.getBoolean("placeholders.eco-identifier", true);
         confirmSeconds = Math.max(5, c.getInt("pay-confirm-seconds", 30));
+        String payDefault = c.getString("pay-default-currency", "").trim();
+        payDefaultCurrency = payDefault.isEmpty() ? null : payDefault;
+        if (payDefaultCurrency != null && !names.contains(payDefaultCurrency.toLowerCase(Locale.ROOT)))
+            throw new IllegalArgumentException("pay-default-currency 指向不存在的货币 " + payDefaultCurrency);
+        guiEnabled = c.getBoolean("gui.enabled", true);
+        guiSkipSingleCurrency = c.getBoolean("gui.skip-single-currency", false);
+        List<?> presets = c.getList("gui.amounts");
+        if (presets == null || presets.isEmpty()) presets = java.util.Arrays.asList(10, 50, 100, 200, 500, 1000, 2000, 3000, 5000);
+        if (presets.size() > 21) throw new IllegalArgumentException("gui.amounts 最多 21 个");
+        for (Object o : presets) guiPresets.add(String.valueOf(o).trim());
+        guiCustomTimeoutSeconds = Math.max(5, c.getInt("gui.custom-timeout-seconds", 30));
+        List<String> cancel = c.getStringList("gui.cancel-words");
+        if (cancel.isEmpty()) cancel = java.util.Arrays.asList("取消", "cancel");
+        for (String w : cancel) guiCancelWords.add(w.trim().toLowerCase(Locale.ROOT));
     }
 
     /** 按配置时区的当天日期，例如 20261103。 */

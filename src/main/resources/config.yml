@@ -40,6 +40,7 @@ currencies:                              # 货币列表；新增货币就复制�
     max-balance: 0                       # 余额上限，0 为不限制
     format: "&d{amount} &f喵币"           # 显示格式，{amount} 为金额，{name} 为名称，支持 & 颜色代码
     grouping: true                       # 金额是否显示千分位逗号，如 1,200
+    icon: GOLD_INGOT                     # 转账菜单里的图标材质名，留空用绿宝石；新旧版本材质名不同时会显示为纸
     pay:                                 # 玩家之间转账的设置
       enabled: true                      # 是否允许玩家转账这种货币
       min: 1                             # 单笔最少转多少
@@ -63,6 +64,7 @@ currencies:                              # 货币列表；新增货币就复制�
     max-balance: 0                       # 不限上限
     format: "&b{amount} &f星币"           # 显示格式
     grouping: true                       # 显示千分位
+    icon: DIAMOND                        # 转账菜单图标
     pay:                                 # 转账设置
       enabled: true                      # 允许转账
       min: 1                             # 单笔最少 1
@@ -89,7 +91,15 @@ currencies:                              # 货币列表；新增货币就复制�
     pay:                                 # 转账设置
       enabled: false                     # 不允许玩家之间转账银币
 
-default-currency: miaobi                 # 命令里不写货币时默认用哪种（/pay、/eco、/baltop、/pay limit）
+default-currency: miaobi                 # 命令里不写货币时默认用哪种（/eco、/baltop、/money 等）
+pay-default-currency: ""                 # /pay <玩家> <数量> 不写货币时转哪种，留空则用 default-currency
+
+gui:                                     # /pay 转账菜单
+  enabled: true                          # 是否启用；关闭后 /pay 不带参数只显示用法
+  skip-single-currency: false            # 只有一种货币可转时跳过选货币，直接进入选金额
+  amounts: [10, 50, 100, 200, 500, 1000, 2000, 3000, 5000] # 金额按钮，最多 21 个；超出单笔上下限的按钮自动隐藏
+  custom-timeout-seconds: 30             # 点“自定义金额”后，在聊天栏输入金额的有效时间（秒）
+  cancel-words: ["取消", "cancel"]        # 输入自定义金额时，发送这些词可取消
 
 vault:                                   # Vault 只能对接一种货币，Essentials、商店等插件通过 Vault 用的就是它
   enabled: true                          # 是否向 Vault 提供经济服务

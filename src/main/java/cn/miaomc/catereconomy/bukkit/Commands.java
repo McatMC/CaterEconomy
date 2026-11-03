@@ -173,25 +173,64 @@ final class Commands implements TabExecutor {
             payLimit(player, s, m, args.length == 2 ? args[1] : null);
             return;
         }
-        // /pay <玩家> <数量> [货币]、/pay <玩家> <货币> <数量>
-        if (args.length < 2 || args.length > 3) {
+        if (args.length == 0) {
+            // /pay：打开转账菜单
+            if (plugin.settings().guiEnabled) plugin.payGui().openPlayers(player, 0);
+            else sender.sendMessage(m.get("usage-pay"));
+            return;
+        }
+        if (args.length > 3) {
             sender.sendMessage(m.get("usage-pay"));
             return;
         }
         String targetName = args[0];
+        if (targetName.equalsIgnoreCase(player.getName())) {
+            sender.sendMessage(m.get("pay-self"));
+            return;
+        }
+        // /pay <玩家> 打开选货币菜单；/pay <玩家> <货币> 直接打开选金额菜单
+        CurrencyDef menuCurrency = args.length == 2 && !looksLikeNumber(args[1]) ? s.currency(args[1]) : null;
+        if (args.length == 1 || menuCurrency != null) {
+            if (!plugin.settings().guiEnabled) {
+                sender.sendMessage(m.get("usage-pay"));
+                return;
+            }
+            if (menuCurrency != null && !payableFor(sender, menuCurrency)) {
+                sender.sendMessage(m.get("pay-disabled", "currency", menuCurrency.name));
+                return;
+            }
+            s.onMain(
+                    s.resolve(targetName, false),
+                    (target, error) -> {
+                        if (error != null) {
+                            dbError(sender, m, error);
+                            return;
+                        }
+                        if (target == null) {
+                            sender.sendMessage(m.get("player-not-found", "player", targetName));
+                            return;
+                        }
+                        if (target.uuid.equals(player.getUniqueId())) {
+                            sender.sendMessage(m.get("pay-self"));
+                            return;
+                        }
+                        plugin.payGui().openCurrencies(player, target, menuCurrency);
+                    });
+            return;
+        }
+        // /pay <玩家> <数量> [货币]、/pay <玩家> <货币> <数量>
         String amountText = args[1];
         String currencyText = args.length == 3 ? args[2] : null;
         if (currencyText != null && s.currency(args[1]) != null && s.currency(args[2]) == null) {
             currencyText = args[1];
             amountText = args[2];
         }
-        CurrencyDef cur = currencyText == null ? s.defaultCurrency() : s.currency(currencyText);
+        CurrencyDef cur = currencyText == null ? payDefault(s) : s.currency(currencyText);
         if (cur == null) {
             unknownCurrency(sender, s, m, currencyText);
             return;
         }
-        // 每种货币可用 catereconomy.pay.<id> 单独禁止转账（显式设为 false 时生效）
-        if (!cur.payable || denied(sender, "catereconomy.pay." + cur.id)) {
+        if (!payableFor(sender, cur)) {
             sender.sendMessage(m.get("pay-disabled", "currency", cur.name));
             return;
         }
@@ -202,31 +241,7 @@ final class Commands implements TabExecutor {
             sender.sendMessage(m.get("invalid-amount", "decimals", cur.decimals));
             return;
         }
-        if (amount <= 0 || amount < cur.payMin) {
-            sender.sendMessage(m.get("pay-too-small", "min", cur.format(Math.max(cur.payMin, 1))));
-            return;
-        }
-        if (cur.payMax > 0 && amount > cur.payMax) {
-            sender.sendMessage(m.get("pay-too-large", "max", cur.format(cur.payMax)));
-            return;
-        }
-        if (targetName.equalsIgnoreCase(player.getName())) {
-            sender.sendMessage(m.get("pay-self"));
-            return;
-        }
-        long[] split = cur.split(amount, sender.hasPermission("catereconomy.bypass.tax"));
-        if (split[1] <= 0) {
-            sender.sendMessage(m.get("pay-too-small-after-tax", "tax", cur.taxPercent.stripTrailingZeros().toPlainString()));
-            return;
-        }
-        if (cur.payCooldownSeconds > 0 && !sender.hasPermission("catereconomy.bypass.cooldown")) {
-            Long last = payCooldowns.get(player.getUniqueId());
-            long left = last == null ? 0 : last + cur.payCooldownSeconds * 1000L - System.currentTimeMillis();
-            if (left > 0) {
-                sender.sendMessage(m.get("pay-cooldown", "seconds", (left + 999) / 1000));
-                return;
-            }
-        }
+        if (!precheck(player, m, cur, amount)) return;
         long finalAmount = amount;
         s.onMain(
                 s.resolve(targetName, false),
@@ -243,11 +258,11 @@ final class Commands implements TabExecutor {
                         sender.sendMessage(m.get("pay-self"));
                         return;
                     }
-                    Long threshold = plugin.settings().confirmAbove.get(cur.id);
-                    if (threshold != null && threshold > 0 && finalAmount >= threshold) {
+                    if (needsConfirm(cur, finalAmount)) {
                         pending.put(
                                 player.getUniqueId(),
                                 new PendingPay(cur, target, finalAmount, System.currentTimeMillis() + plugin.settings().confirmSeconds * 1000L));
+                        long[] split = cur.split(finalAmount, player.hasPermission("catereconomy.bypass.tax"));
                         sender.sendMessage(
                                 m.get(
                                         "pay-confirm",
@@ -267,7 +282,50 @@ final class Commands implements TabExecutor {
                 });
     }
 
-    private void doPay(Player player, EconomyService s, Messages m, CurrencyDef cur, Account target, long amount) {
+    /** 不写货币时 /pay 使用的货币：pay-default-currency，未设置则用 default-currency。 */
+    CurrencyDef payDefault(EconomyService s) {
+        CurrencyDef cur = s.currency(plugin.settings().payDefaultCurrency);
+        return cur != null ? cur : s.defaultCurrency();
+    }
+
+    /** 这种货币是否允许该玩家转账（配置开启且没有被 catereconomy.pay.<id> 显式禁止）。 */
+    boolean payableFor(CommandSender sender, CurrencyDef cur) {
+        return cur.payable && !denied(sender, "catereconomy.pay." + cur.id);
+    }
+
+    /** 金额范围、税后到账和冷却检查；不通过时已向玩家发送提示。 */
+    boolean precheck(Player player, Messages m, CurrencyDef cur, long amount) {
+        if (amount <= 0 || amount < cur.payMin) {
+            player.sendMessage(m.get("pay-too-small", "min", cur.format(Math.max(cur.payMin, 1))));
+            return false;
+        }
+        if (cur.payMax > 0 && amount > cur.payMax) {
+            player.sendMessage(m.get("pay-too-large", "max", cur.format(cur.payMax)));
+            return false;
+        }
+        long[] split = cur.split(amount, player.hasPermission("catereconomy.bypass.tax"));
+        if (split[1] <= 0) {
+            player.sendMessage(m.get("pay-too-small-after-tax", "tax", cur.taxPercent.stripTrailingZeros().toPlainString()));
+            return false;
+        }
+        if (cur.payCooldownSeconds > 0 && !player.hasPermission("catereconomy.bypass.cooldown")) {
+            Long last = payCooldowns.get(player.getUniqueId());
+            long left = last == null ? 0 : last + cur.payCooldownSeconds * 1000L - System.currentTimeMillis();
+            if (left > 0) {
+                player.sendMessage(m.get("pay-cooldown", "seconds", (left + 999) / 1000));
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** 单笔达到 confirm-above 时需要二次确认。 */
+    boolean needsConfirm(CurrencyDef cur, long amount) {
+        Long threshold = plugin.settings().confirmAbove.get(cur.id);
+        return threshold != null && threshold > 0 && amount >= threshold;
+    }
+
+    void doPay(Player player, EconomyService s, Messages m, CurrencyDef cur, Account target, long amount) {
         long[] split = cur.split(amount, player.hasPermission("catereconomy.bypass.tax"));
         Settings st = plugin.settings();
         String ip =
@@ -348,7 +406,7 @@ final class Commands implements TabExecutor {
 
     /** /pay limit [货币]：查看自己今天已接收的转账和剩余额度，以及税率。 */
     private void payLimit(Player player, EconomyService s, Messages m, String key) {
-        CurrencyDef cur = key == null ? s.defaultCurrency() : s.currency(key);
+        CurrencyDef cur = key == null ? payDefault(s) : s.currency(key);
         if (cur == null) {
             unknownCurrency(player, s, m, key);
             return;
