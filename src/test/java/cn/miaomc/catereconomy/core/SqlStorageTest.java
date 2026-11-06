@@ -56,6 +56,20 @@ class SqlStorageTest {
     }
 
     @Test
+    void pluginRecordTypesRoundTripInHistory() throws Exception {
+        storage.deposit(coin, alice, 300, Record.Type.PLUGIN_DEPOSIT, "s", "NoahArk:quest");
+        assertEquals(Change.Status.INSUFFICIENT, storage.withdraw(coin, alice, 301, Record.Type.PLUGIN_WITHDRAW, "s", "NoahArk:shop").status);
+        storage.withdraw(coin, alice, 120, Record.Type.PLUGIN_WITHDRAW, "s", "NoahArk:shop");
+        List<Record> log = storage.history(alice.uuid, Arrays.asList("coin"), false, 10, 0);
+        assertEquals(2, log.size());
+        assertEquals(Record.Type.PLUGIN_WITHDRAW, log.get(0).type);
+        assertEquals(180, log.get(0).balanceAfter);
+        assertEquals("NoahArk:shop", log.get(0).actor);
+        assertEquals(Record.Type.PLUGIN_DEPOSIT, log.get(1).type);
+        assertEquals(0, storage.history(alice.uuid, Arrays.asList("coin"), true, 10, 0).size());
+    }
+
+    @Test
     void withdrawNeverGoesNegative() throws Exception {
         storage.deposit(coin, alice, 50, Record.Type.GIVE, "s", "op");
         Change fail = storage.withdraw(coin, alice, 80, Record.Type.TAKE, "s", "op");

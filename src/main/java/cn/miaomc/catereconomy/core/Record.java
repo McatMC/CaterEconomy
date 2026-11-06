@@ -12,6 +12,10 @@ public final class Record {
         RESET,
         VAULT_DEPOSIT,
         VAULT_WITHDRAW,
+        /** 其他插件通过 CaterEconomyAPI 加钱。 */
+        PLUGIN_DEPOSIT,
+        /** 其他插件通过 CaterEconomyAPI 扣钱。 */
+        PLUGIN_WITHDRAW,
         IMPORT
     }
 

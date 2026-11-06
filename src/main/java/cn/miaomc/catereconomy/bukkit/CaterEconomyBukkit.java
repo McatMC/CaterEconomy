@@ -76,6 +76,7 @@ public final class CaterEconomyBukkit extends JavaPlugin implements Listener {
             settings = next;
             messages = nextMessages;
             service = nextService;
+            cn.miaomc.catereconomy.api.CaterEconomyAPI.bind(nextService);
         } catch (IllegalArgumentException e) {
             getLogger().severe("config.yml：" + e.getMessage());
             return false;
@@ -128,6 +129,7 @@ public final class CaterEconomyBukkit extends JavaPlugin implements Listener {
         }
         EconomyService old = service;
         service = null;
+        cn.miaomc.catereconomy.api.CaterEconomyAPI.bind(null);
         if (old != null) old.close();
     }
 
